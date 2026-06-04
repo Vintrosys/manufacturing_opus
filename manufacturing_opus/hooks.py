@@ -253,3 +253,19 @@ require_type_annotated_api_methods = True
 # List of apps whose translatable strings should be excluded from this app's translations.
 # ignore_translatable_strings_from = []
 
+
+# Manufacturing Opus Customizations
+fixtures = [{"dt": "Server Script"}]
+
+doctype_js = {
+    "Job Card": "public/js/job_card.js"
+}
+
+override_doctype_class = {
+    "Stock Entry": "manufacturing_opus.overrides.stock_entry.CustomSe",
+    "Job Card": "manufacturing_opus.overrides.job_card.JC"
+}
+
+override_whitelisted_methods = {
+    "erpnext.manufacturing.doctype.job_card.job_card.make_time_log": "manufacturing_opus.overrides.job_card.make_time_log"
+}
