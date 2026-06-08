@@ -39,20 +39,18 @@ class JC(JobCard):
             frappe.throw(_("Kindly Complete Planned Qty and Submit"))          
     
     def get_current_operation_data(self):
-        return frappe.get_all(
-            "Job Card",
-            fields=[
-                "sum(total_time_in_mins) as time_in_mins",
-                "sum(total_completed_qty) as completed_qty",
-                "sum(process_loss_qty) as process_loss_qty",
-            ],
-            filters={
-                "docstatus": ("!=", 2),
-                "work_order": self.work_order,
-                "operation_id": self.operation_id,
-                "is_corrective_job_card": 0,
-            },
-        )
+        return frappe.db.sql("""
+            SELECT 
+                sum(total_time_in_mins) as time_in_mins,
+                sum(total_completed_qty) as completed_qty,
+                sum(process_loss_qty) as process_loss_qty
+            FROM `tabJob Card`
+            WHERE 
+                docstatus != 2
+                AND work_order = %s
+                AND operation_id = %s
+                AND is_corrective_job_card = 0
+        """, (self.work_order, self.operation_id), as_dict=1)
     
     def validate_sequence_id(self):
        return
