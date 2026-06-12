@@ -147,13 +147,15 @@ def make_time_log(args: dict | str) -> None:
                     )
                 )
 
-        se, action = _make_or_update_manufacture_stock_entry(wo, doc, completed_qty)
+        se = _make_manufacture_stock_entry(wo, doc, completed_qty)
+        se.flags.ignore_job_card_check = True
+        se.insert(ignore_permissions=True)
 
         frappe.msgprint(
             msg="""
-                <b>Stock Entry {action}:</b><br>
+                <b>Stock Entry Created:</b><br>
                 <a href="/app/stock-entry/{name}" target="_blank">{name}</a>
-            """.format(action=action, name=se.name),
+            """.format(name=se.name),
             title="Success",
             indicator="green",
         )
@@ -169,53 +171,41 @@ def make_time_log(args: dict | str) -> None:
         )
 
 
-def _make_or_update_manufacture_stock_entry(wo, job_card_doc, newly_completed_qty):
+def _make_manufacture_stock_entry(wo, job_card_doc, completed_qty):
     """
-    Build or Update a Manufacture Stock Entry directly from BOM.
-    Accumulates partial quantities into a single Draft entry.
+    Build a Manufacture Stock Entry directly from BOM.
+    - Last operation: FG item row (target) + RM rows (source)
+    - Intermediate operations: only RM consumption rows (source → WIP)
     """
-    existing_se_name = frappe.db.get_value(
-        "Stock Entry", 
-        {"job_card": job_card_doc.name, "purpose": "Manufacture", "docstatus": 0},
-        "name"
-    )
-
-    if existing_se_name:
-        se = frappe.get_doc("Stock Entry", existing_se_name)
-        se.fg_completed_qty = flt(se.fg_completed_qty) + flt(newly_completed_qty)
-        # Do not clear existing items; we append new rows for this specific batch
-        se_action = "Updated"
-    else:
-        se = frappe.new_doc("Stock Entry")
-        se.stock_entry_type    = "Manufacture"
-        se.purpose             = "Manufacture"
-        se.work_order          = wo.name
-        se.job_card            = job_card_doc.name
-        se.company             = wo.company
-        se.posting_date        = frappe.utils.today()
-        se.posting_time        = frappe.utils.nowtime()
-        se.from_bom            = 1
-        se.bom_no              = wo.bom_no
-        se.fg_completed_qty    = flt(newly_completed_qty)
-        se.use_multi_level_bom = wo.use_multi_level_bom
-        se_action = "Created"
-
-    qty_to_append = flt(newly_completed_qty)
     bom = frappe.get_doc("BOM", wo.bom_no)
+
+    se = frappe.new_doc("Stock Entry")
+    se.stock_entry_type    = "Manufacture"
+    se.purpose             = "Manufacture"
+    se.work_order          = wo.name
+    se.job_card            = job_card_doc.name
+    se.company             = wo.company
+    se.posting_date        = frappe.utils.today()
+    se.posting_time        = frappe.utils.nowtime()
+    se.from_bom            = 1
+    se.bom_no              = wo.bom_no
+    se.fg_completed_qty    = completed_qty
+    se.use_multi_level_bom = wo.use_multi_level_bom
+
     is_last_op = job_card_doc.sequence_id == len(wo.operations)
 
     # ── Finished Good row — only on the last operation ──────────────
     if is_last_op:
         se.append("items", {
             "item_code":        wo.production_item,
-            "qty":              qty_to_append,
+            "qty":              completed_qty,
             "t_warehouse":      wo.fg_warehouse,
             "is_finished_item": 1,
         })
 
     # ── Raw Material rows — proportional to BOM qty ─────────────────
     bom_qty = flt(bom.quantity) or 1
-    ratio   = qty_to_append / bom_qty
+    ratio   = completed_qty / bom_qty
 
     for item in bom.items:
         required_qty = flt(item.qty) * ratio
@@ -231,13 +221,7 @@ def _make_or_update_manufacture_stock_entry(wo, job_card_doc, newly_completed_qt
             "allow_alternative_item": item.allow_alternative_item,
         })
 
-    se.flags.ignore_job_card_check = True
-    if se_action == "Created":
-        se.insert(ignore_permissions=True)
-    else:
-        se.save(ignore_permissions=True)
-        
-    return se, se_action
+    return se
 
 
 @frappe.whitelist()

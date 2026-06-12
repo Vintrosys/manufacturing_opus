@@ -7,44 +7,53 @@ frappe.ui.form.on('Job Card', {
             });
         }
 
-        // Remove standard buttons to prevent duplicates and glitches
-        frm.remove_custom_button(__("Start Job"));
-        frm.remove_custom_button(__("Complete Job"));
-
-        // Logic to show "Start Job" or "Complete Job"
-        let last_log = frm.doc.time_logs && frm.doc.time_logs.length > 0 ? frm.doc.time_logs[frm.doc.time_logs.length - 1] : null;
-        let is_running = last_log && !last_log.to_time;
-        let remaining = flt(frm.doc.for_quantity) - flt(frm.doc.total_completed_qty);
-        
-        if (frm.doc.docstatus === 0 && remaining > 0) {
-            if (!is_running) {
-                frm.add_custom_button(__("Start Job"), () => {
-                    let from_time = frappe.datetime.now_datetime();
-                    if ((frm.doc.employee && !frm.doc.employee.length) || !frm.doc.employee) {
-                        frappe.prompt(
-                            {
-                                fieldtype: "Table MultiSelect",
-                                label: __("Select Employees"),
-                                options: "Job Card Time Log",
-                                fieldname: "employees",
-                                reqd: 1,
-                                filters: { status: "Active" },
-                            },
-                            (d) => {
-                                frm.events.start_timer(frm, from_time, d.employees);
-                            },
-                            __("Assign Job to Employee")
-                        );
-                    } else {
-                        frm.events.start_timer(frm, from_time, frm.doc.employee);
+        // Logic to show "Start Job" if it's missing and we have pending quantity
+        setTimeout(() => {
+            let last_log = frm.doc.time_logs && frm.doc.time_logs.length > 0 ? frm.doc.time_logs[frm.doc.time_logs.length - 1] : null;
+            let is_running = last_log && !last_log.to_time;
+            let remaining = flt(frm.doc.for_quantity) - flt(frm.doc.total_completed_qty);
+            
+            if (frm.doc.docstatus === 0 && remaining > 0) {
+                if (!is_running) {
+                    // Check if "Start Job" is missing
+                    let btn = frm.page.inner_toolbar.find('[data-label="Start%20Job"]');
+                    if (btn.length === 0) {
+                        frm.add_custom_button(__("Start Job"), () => {
+                            let from_time = frappe.datetime.now_datetime();
+                            if ((frm.doc.employee && !frm.doc.employee.length) || !frm.doc.employee) {
+                                frappe.prompt(
+                                    {
+                                        fieldtype: "Table MultiSelect",
+                                        label: __("Select Employees"),
+                                        options: "Job Card Time Log",
+                                        fieldname: "employees",
+                                        reqd: 1,
+                                        filters: { status: "Active" },
+                                    },
+                                    (d) => {
+                                        frm.events.start_timer(frm, from_time, d.employees);
+                                    },
+                                    __("Assign Job to Employee")
+                                );
+                            } else {
+                                frm.events.start_timer(frm, from_time, frm.doc.employee);
+                            }
+                        }).removeClass('btn-default').addClass('btn-primary');
                     }
-                }).removeClass('btn-default').addClass('btn-primary');
-            } else {
-                frm.add_custom_button(__("Complete Job"), () => {
-                    frm.events.complete_job_card(frm);
-                }).removeClass('btn-default').addClass('btn-primary');
+                } else {
+                    // It IS running! We need to show OUR "Complete Job" button!
+                    // Let's remove the standard one if it exists
+                    frm.page.remove_inner_button(__("Complete Job"));
+                    
+                    let btn = frm.page.inner_toolbar.find('[data-label="Complete%20Job"]');
+                    if (btn.length === 0) {
+                        frm.add_custom_button(__("Complete Job"), () => {
+                            frm.events.complete_job_card(frm);
+                        }).removeClass('btn-default').addClass('btn-primary');
+                    }
+                }
             }
-        }
+        }, 300);
     },
 
     complete_job_card(frm) {

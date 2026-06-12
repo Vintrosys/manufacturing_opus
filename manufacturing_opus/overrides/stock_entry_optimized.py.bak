@@ -33,7 +33,3 @@ class CustomSe(StockEntry):
                 self.check_duplicate_entry_for_work_order()
         elif self.purpose != "Material Transfer":
             self.work_order = None
-
-    def validate_job_card_fg_item(self):
-        # Bypass frappe's buggy validation where job_card.finished_good evaluates to None
-        pass
