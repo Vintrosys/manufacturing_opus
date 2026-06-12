@@ -6,6 +6,7 @@ import json
 from frappe import _
 from erpnext.accounts.doctype.pos_invoice.pos_invoice import get_stock_availability
 from frappe import _, bold
+from typing import Union
 
 
 class OperationSequenceError(frappe.ValidationError):
@@ -94,7 +95,7 @@ class JC(JobCard):
 
 
 @frappe.whitelist()
-def make_time_log(args: dict | str) -> None:
+def make_time_log(args: Union[dict, str]) -> None:
     if isinstance(args, str):
         args = json.loads(args)
 
@@ -123,15 +124,22 @@ def make_time_log(args: dict | str) -> None:
         return
 
     if doc.sequence_id and doc.sequence_id > 1:
-        prev_op = wo.operations[doc.sequence_id - 2]
-        current_op = wo.operations[doc.sequence_id - 1]
-        if prev_op.completed_qty < current_op.completed_qty:
-            frappe.throw(
-                _(
-                    "Excess Production not allowed. Kindly Complete Previous "
-                    "Operations Qty before Completing this Operation Qty"
+        current_op_idx = -1
+        for i, op in enumerate(wo.operations):
+            if op.name == doc.operation_id:
+                current_op_idx = i
+                break
+                
+        if current_op_idx > 0:
+            prev_op = wo.operations[current_op_idx - 1]
+            current_op = wo.operations[current_op_idx]
+            if prev_op.completed_qty < current_op.completed_qty:
+                frappe.throw(
+                    _(
+                        "Excess Production not allowed. Kindly Complete Previous "
+                        "Operations Qty before Completing this Operation Qty"
+                    )
                 )
-            )
 
     is_last_operation = doc.sequence_id == len(wo.operations)
 
@@ -270,7 +278,7 @@ def get_mtfm_items(work_order: str) -> list:
 
 
 @frappe.whitelist()
-def create_material_transfer(work_order: str, items: list | str, job_card: str) -> None:
+def create_material_transfer(work_order: str, items: Union[list, str], job_card: str) -> None:
     items = frappe.parse_json(items)
 
     new_se = frappe.new_doc("Stock Entry")
