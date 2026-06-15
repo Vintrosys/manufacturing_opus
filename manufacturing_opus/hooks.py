@@ -258,7 +258,8 @@ require_type_annotated_api_methods = True
 fixtures = [{"dt": "Server Script"}]
 
 doctype_js = {
-    "Job Card": "public/js/job_card.js"
+    "Job Card": "public/js/job_card.js",
+    "Work Order": "public/js/work_order.js"
 }
 
 override_doctype_class = {

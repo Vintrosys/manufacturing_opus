@@ -93,6 +93,17 @@ class JC(JobCard):
         self.validate_produced_quantity(for_quantity, process_loss_qty, wo)
         self.update_work_order_data(for_quantity, process_loss_qty, time_in_mins, wo)
 
+        if self.docstatus == 1:
+            needs_save = False
+            for row in wo.operations:
+                if row.name == self.operation_id and row.status != "Completed":
+                    row.status = "Completed"
+                    needs_save = True
+            
+            if needs_save:
+                wo.flags.ignore_validate_update_after_submit = True
+                wo.save(ignore_permissions=True)
+
 
 @frappe.whitelist()
 def make_time_log(args: Union[dict, str]) -> None:
@@ -311,3 +322,12 @@ def create_material_transfer(work_order: str, items: Union[list, str], job_card:
         title="Success",
         indicator="green",
     )
+
+
+@frappe.whitelist()
+def force_submit_job_card(job_card: str) -> str:
+    doc = frappe.get_doc("Job Card", job_card)
+    doc.for_quantity = doc.total_completed_qty
+    doc.save(ignore_permissions=True)
+    doc.submit()
+    return "Success"
