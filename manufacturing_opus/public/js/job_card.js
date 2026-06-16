@@ -5,6 +5,48 @@ frappe.ui.form.on('Job Card', {
             frm.add_custom_button("Transfer RM", () => {
                 frm.trigger("open_rm_selection_popup");
             });
+
+            if (frm.doc.total_completed_qty > 0) {
+                frm.add_custom_button(__("Force Submit"), () => {
+                    const d = new frappe.ui.Dialog({
+                        title: __('Force Submit Job Card'),
+                        fields: [
+                            {
+                                fieldtype: 'HTML',
+                                fieldname: 'message',
+                                options: `<div style="margin-bottom: 10px;">${__("You are about to submit this Job Card with a partial completed quantity.")}</div>
+                                          <div><b>${__("Planned Qty:")}</b> ${frm.doc.for_quantity}</div>
+                                          <div><b>${__("Completed Qty:")}</b> ${frm.doc.total_completed_qty}</div>
+                                          <br>
+                                          <div>${__("Are you sure you want to force submit?")}</div>`
+                            }
+                        ],
+                        primary_action_label: __('Submit'),
+                        primary_action_classes: 'btn-danger',
+                        primary_action(values) {
+                            d.hide();
+                            frappe.dom.freeze(__('Submitting...'));
+                            frappe.call({
+                                method: 'manufacturing_opus.overrides.job_card.force_submit_job_card',
+                                args: {
+                                    job_card: frm.doc.name
+                                },
+                                callback: function(r) {
+                                    frappe.dom.unfreeze();
+                                    if(!r.exc) {
+                                        frm.reload_doc();
+                                        frappe.show_alert({message: __('Job Card Successfully Completed'), indicator: 'green'});
+                                    }
+                                },
+                                error: function(r) {
+                                    frappe.dom.unfreeze();
+                                }
+                            });
+                        }
+                    });
+                    d.show();
+                }).removeClass('btn-default').addClass('btn-danger');
+            }
         }
 
         // Remove standard buttons to prevent duplicates and glitches
