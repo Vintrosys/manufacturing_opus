@@ -4,36 +4,39 @@ from erpnext.stock.doctype.stock_entry.stock_entry import StockEntry
 
 
 class CustomSe(StockEntry):
-    def validate_work_order(self):
-        if self.purpose == "Manufacture" and self.work_order:
-            # Skip this check if the Stock Entry is being auto-created
-            # from the Job Card partial completion flow (flag set by make_time_log)
-            if not self.flags.get("ignore_job_card_check"):
-                jc = frappe.get_list(
-                    "Job Card",
-                    filters={"work_order": self.work_order, "status": ("!=", "Completed"), "docstatus": ("<", 2)}
-                )
-                if jc:
-                    frappe.throw(
-                        _("Please complete the Job card before completing Manufacture Stock entry.")
-                    )
+	def validate_work_order(self):
+		if self.purpose == "Manufacture" and self.work_order:
+			# Skip this check if the Stock Entry is being auto-created
+			# from the Job Card partial completion flow (flag set by make_time_log)
+			if not self.flags.get("ignore_job_card_check"):
+				jc = frappe.get_list(
+					"Job Card",
+					filters={
+						"work_order": self.work_order,
+						"status": ("!=", "Completed"),
+						"docstatus": ("<", 2),
+					},
+				)
+				if jc:
+					frappe.throw(
+						_("Please complete the Job card before completing Manufacture Stock entry.")
+					)
 
-        if self.purpose in (
-            "Manufacture",
-            "Material Transfer for Manufacture",
-            "Material Consumption for Manufacture",
-            "Disassemble",
-        ):
-            if (
-                self.purpose == "Manufacture"
-                or self.purpose == "Material Consumption for Manufacture"
-            ) and self.work_order:
-                if not self.fg_completed_qty:
-                    frappe.throw(_("For Quantity (Manufactured Qty) is mandatory"))
-                self.check_duplicate_entry_for_work_order()
-        elif self.purpose != "Material Transfer":
-            self.work_order = None
+		if self.purpose in (
+			"Manufacture",
+			"Material Transfer for Manufacture",
+			"Material Consumption for Manufacture",
+			"Disassemble",
+		):
+			if (
+				self.purpose == "Manufacture" or self.purpose == "Material Consumption for Manufacture"
+			) and self.work_order:
+				if not self.fg_completed_qty:
+					frappe.throw(_("For Quantity (Manufactured Qty) is mandatory"))
+				self.check_duplicate_entry_for_work_order()
+		elif self.purpose != "Material Transfer":
+			self.work_order = None
 
-    def validate_job_card_fg_item(self):
-        # Bypass frappe's buggy validation where job_card.finished_good evaluates to None
-        pass
+	def validate_job_card_fg_item(self):
+		# Bypass frappe's buggy validation where job_card.finished_good evaluates to None
+		pass
