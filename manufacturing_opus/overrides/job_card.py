@@ -61,6 +61,14 @@ class JC(JobCard):
             as_dict=1,
         )
 
+    def validate_produced_quantity(self, for_quantity, process_loss_qty, wo):
+        """Override to accept wo parameter"""
+        pass
+
+    def update_work_order_data(self, for_quantity, process_loss_qty, time_in_mins, wo):
+        """Override to accept wo parameter"""
+        pass
+
     def validate_sequence_id(self):
         return
 
@@ -166,7 +174,7 @@ def make_time_log(args: Union[dict, str]) -> None:
                     )
                 )
 
-        se, action = _make_or_update_manufacture_stock_entry(wo, doc, completed_qty)
+        se, action = _make_manufacture_stock_entry(wo, doc, completed_qty)
 
         frappe.msgprint(
             msg="""
@@ -188,36 +196,23 @@ def make_time_log(args: Union[dict, str]) -> None:
         )
 
 
-def _make_or_update_manufacture_stock_entry(wo, job_card_doc, newly_completed_qty):
+def _make_manufacture_stock_entry(wo, job_card_doc, newly_completed_qty):
     """
-    Build or Update a Manufacture Stock Entry directly from BOM.
-    Accumulates partial quantities into a single Draft entry.
+    Build a Manufacture Stock Entry directly from BOM.
+    Always creates a new Draft entry for each partial completion.
     """
-    existing_se_name = frappe.db.get_value(
-        "Stock Entry", 
-        {"job_card": job_card_doc.name, "purpose": "Manufacture", "docstatus": 0},
-        "name"
-    )
-
-    if existing_se_name:
-        se = frappe.get_doc("Stock Entry", existing_se_name)
-        se.fg_completed_qty = flt(se.fg_completed_qty) + flt(newly_completed_qty)
-        # Do not clear existing items; we append new rows for this specific batch
-        se_action = "Updated"
-    else:
-        se = frappe.new_doc("Stock Entry")
-        se.stock_entry_type    = "Manufacture"
-        se.purpose             = "Manufacture"
-        se.work_order          = wo.name
-        se.job_card            = job_card_doc.name
-        se.company             = wo.company
-        se.posting_date        = frappe.utils.today()
-        se.posting_time        = frappe.utils.nowtime()
-        se.from_bom            = 1
-        se.bom_no              = wo.bom_no
-        se.fg_completed_qty    = flt(newly_completed_qty)
-        se.use_multi_level_bom = wo.use_multi_level_bom
-        se_action = "Created"
+    se = frappe.new_doc("Stock Entry")
+    se.stock_entry_type    = "Manufacture"
+    se.purpose             = "Manufacture"
+    se.work_order          = wo.name
+    se.job_card            = job_card_doc.name
+    se.company             = wo.company
+    se.posting_date        = frappe.utils.today()
+    se.posting_time        = frappe.utils.nowtime()
+    se.from_bom            = 1
+    se.bom_no              = wo.bom_no
+    se.fg_completed_qty    = flt(newly_completed_qty)
+    se.use_multi_level_bom = wo.use_multi_level_bom
 
     qty_to_append = flt(newly_completed_qty)
     bom = frappe.get_doc("BOM", wo.bom_no)
@@ -251,12 +246,9 @@ def _make_or_update_manufacture_stock_entry(wo, job_card_doc, newly_completed_qt
         })
 
     se.flags.ignore_job_card_check = True
-    if se_action == "Created":
-        se.insert(ignore_permissions=True)
-    else:
-        se.save(ignore_permissions=True)
+    se.insert(ignore_permissions=True)
         
-    return se, se_action
+    return se, "Created"
 
 
 @frappe.whitelist()

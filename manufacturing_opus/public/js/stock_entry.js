@@ -1,9 +1,4 @@
-import frappe
-
-def fix_client_script():
-    script = frappe.get_doc("Client Script", "Fetching Total Bags Qty")
-    
-    script.script = """frappe.ui.form.on("Stock Entry", {
+frappe.ui.form.on("Stock Entry", {
     refresh: function(frm) {
         if (frm.doc.docstatus === 0) {
             fetch_work_order_details(frm);
@@ -18,7 +13,6 @@ def fix_client_script():
 });
 
 function fetch_work_order_details(frm) {
-
     if (!frm.doc.work_order) return;
 
     frappe.db.get_doc("Work Order", frm.doc.work_order)
@@ -30,8 +24,4 @@ function fetch_work_order_details(frm) {
                 doc.custom_jumbo_bag_item
             );
         });
-}"""
-    
-    script.save()
-    frappe.db.commit()
-    print("Client Script Updated Successfully")
+}
