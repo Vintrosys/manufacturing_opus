@@ -6,9 +6,9 @@ from erpnext.stock.doctype.stock_entry.stock_entry import StockEntry
 class CustomSe(StockEntry):
 	def validate_work_order(self):
 		if self.purpose == "Manufacture" and self.work_order:
-			# Skip this check if the Stock Entry is being auto-created
-			# from the Job Card partial completion flow (flag set by make_time_log)
-			if not self.flags.get("ignore_job_card_check"):
+			# Skip this check if the Stock Entry is linked to a job card
+			# This allows partial completion Manufacture entries to be submitted
+			if not self.job_card and not self.flags.get("ignore_job_card_check"):
 				jc = frappe.get_list(
 					"Job Card",
 					filters={
